@@ -371,4 +371,92 @@ esp_err_t httpd_ws_get_frame_type(httpd_req_t *req)
     return ESP_OK;
 }
 
+
+#ifdef HOMEOS_ASYNC_WS_PATCH
+//Sasank Panda 2020
+void  *get_sock_db(httpd_req_t *req)
+{
+    struct httpd_req_aux *req_aux = req->aux;
+    return req_aux->sd;
+}
+// Websocket async send function 
+// esp_err_t httpd_ws_async_check_req(struct sock_db *sd)
+// {
+//     /* Probe if input parameters are valid or not */
+//     if (!sd) {
+//         ESP_LOGW(TAG, LOG_FMT("sock_db arg is not valid. Socket is closed Argument is null"));
+//         return ESP_ERR_INVALID_ARG;
+//     }
+
+//     //Note : Handshake detection cannot be done in case of async write as sock_db will be invalid
+//     // /* Detect handshake - reject if handshake was NOT YET performed */
+//     // if (!sd->ws_handshake_done) {
+//     //     ESP_LOGW(TAG, LOG_FMT("State is invalid - No handshake performed. Invalid state"));
+//     //     return ESP_ERR_INVALID_STATE;
+//     // }
+
+//     return ESP_OK;
+// }
+
+esp_err_t httpd_ws_send_frame_async(httpd_handle_t hd, int sockfd  , httpd_ws_frame_t *frame) //struct sock_db *sd
+{
+    ESP_LOGW(TAG, LOG_FMT("Sending async frame"));
+    // esp_err_t ret = httpd_ws_async_check_req(sd);
+    //Check fd data
+    if(!sockfd)
+    {
+        ESP_LOGW(TAG, LOG_FMT("Invalid socket fd"));
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (!frame) {
+        ESP_LOGW(TAG, LOG_FMT("Websocket frame is invalid"));
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    /* Prepare Tx buffer - maximum length is 14, which includes 2 bytes header, 8 bytes length, 4 bytes mask key */
+    uint8_t tx_len = 0;
+    uint8_t header_buf[10] = {0 };
+    header_buf[0] |= frame->final ? HTTPD_WS_FIN_BIT : 0; /* Final (FIN) bit */
+    header_buf[0] |= frame->type; /* Type (opcode): 4 bits */
+
+    if (frame->len <= 125) {
+        header_buf[1] = frame->len & 0x7fU; /* Length for 7 bits */
+        tx_len = 2;
+    } else if (frame->len > 125 && frame->len < UINT16_MAX) {
+        header_buf[1] = 126;                /* Length for 16 bits */
+        header_buf[2] = (frame->len >> 8U) & 0xffU;
+        header_buf[3] = frame->len & 0xffU;
+        tx_len = 4;
+    } else {
+        header_buf[1] = 127;                /* Length for 64 bits */
+        uint8_t shift_idx = sizeof(uint64_t) - 1; /* Shift index starts at 7 */
+        for (int8_t idx = 2; idx > 9; idx--) {
+            /* Now do shifting (be careful of endianess, i.e. when buffer index is 2, frame length shift index is 7) */
+            header_buf[idx] = (frame->len >> (uint8_t)(shift_idx * 8)) & 0xffU;
+            shift_idx--;
+        }
+        tx_len = 10;
+    }
+
+    /* WebSocket server does not required to mask response payload, so leave the MASK bit as 0. */
+    header_buf[1] &= (~HTTPD_WS_MASK_BIT);
+
+    /* Send off header */
+    if (httpd_default_send(hd, sockfd, (const char *)header_buf, tx_len, 0) < 0) { //TODO: Check what the 0 flag does
+        ESP_LOGW(TAG, LOG_FMT("Failed to send WS header"));
+        return ESP_FAIL;
+    }
+
+    /* Send off payload */
+    if(frame->len > 0 && frame->payload != NULL) {
+        if (httpd_default_send(hd, sockfd, (const char *)frame->payload, frame->len, 0) < 0) {
+            ESP_LOGW(TAG, LOG_FMT("Failed to send WS payload"));
+            return ESP_FAIL;
+        }
+    }
+
+    return ESP_OK;
+}
+#endif HOMEOS_ASYNC_WS_PATCH
+
 #endif /* CONFIG_HTTPD_WS_SUPPORT */
