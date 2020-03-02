@@ -52,6 +52,7 @@
 
 #include "esp_netif.h"
 #include "esp_netif_net_stack.h"
+#include "esp_compiler.h"
 
 /**
  * @brief Free resources allocated in L2 layer
@@ -154,12 +155,13 @@ low_level_output(struct netif *netif, struct pbuf *p)
  * @param netif the lwip network interface structure for this ethernetif
  */
 void ESP_IRAM_ATTR
-wlanif_input(struct netif *netif, void *buffer, size_t len, void* eb)
+wlanif_input(void *h, void *buffer, size_t len, void* eb)
 {
+  struct netif * netif = h;
   esp_netif_t *esp_netif = esp_netif_get_handle_from_netif_impl(netif);
   struct pbuf *p;
 
-  if(!buffer || !netif_is_up(netif)) {
+  if(unlikely(!buffer || !netif_is_up(netif))) {
     if (eb) {
       esp_netif_free_rx_buffer(esp_netif, eb);
     }
@@ -189,7 +191,7 @@ wlanif_input(struct netif *netif, void *buffer, size_t len, void* eb)
 #endif
 
   /* full packet send to tcpip_thread to process */
-  if (netif->input(p, netif) != ERR_OK) {
+  if (unlikely(netif->input(p, netif) != ERR_OK)) {
     LWIP_DEBUGF(NETIF_DEBUG, ("ethernetif_input: IP input error\n"));
     pbuf_free(p);
   }
@@ -217,7 +219,9 @@ wlanif_init(struct netif *netif)
   /* Initialize interface hostname */
 
 #if ESP_LWIP
-  netif->hostname = CONFIG_LWIP_LOCAL_HOSTNAME;
+  if (esp_netif_get_hostname(esp_netif_get_handle_from_netif_impl(netif), &netif->hostname) != ESP_OK) {
+    netif->hostname = CONFIG_LWIP_LOCAL_HOSTNAME;
+  }
 #else
   netif->hostname = "lwip";
 #endif

@@ -362,7 +362,6 @@ if(CONFIG_BT_ENABLED)
                     "esp_ble_mesh/mesh_core/main.c"
                     "esp_ble_mesh/mesh_core/net.c"
                     "esp_ble_mesh/mesh_core/prov.c"
-                    "esp_ble_mesh/mesh_core/provisioner_beacon.c"
                     "esp_ble_mesh/mesh_core/provisioner_main.c"
                     "esp_ble_mesh/mesh_core/provisioner_prov.c"
                     "esp_ble_mesh/mesh_core/proxy_client.c"
@@ -496,7 +495,8 @@ if(CONFIG_BT_ENABLED)
                     "host/nimble/nimble/porting/nimble/src/mem.c"
                     "host/nimble/nimble/porting/nimble/src/os_mbuf.c"
                     "host/nimble/nimble/porting/nimble/src/os_cputime.c"
-                    "host/nimble/esp-hci/src/esp_nimble_hci.c")
+                    "host/nimble/esp-hci/src/esp_nimble_hci.c"
+                    "host/nimble/port/src/esp_nimble_mem.c")
 
         if (CONFIG_BLE_MESH)
             list(APPEND srcs "esp_ble_mesh/mesh_core/nimble_host/mesh_bearer_adapt.c")
@@ -538,12 +538,10 @@ endif()
 idf_component_register(SRCS "${srcs}"
                 INCLUDE_DIRS "${include_dirs}"
                 PRIV_INCLUDE_DIRS "${priv_include_dirs}"
-                REQUIRES nvs_flash soc)
+                REQUIRES nvs_flash soc esp_timer)
 
 if(CONFIG_BT_ENABLED)
-    if(GCC_NOT_5_2_0)
-        target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-implicit-fallthrough -Wno-unused-const-variable)
-    endif()
+    target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-implicit-fallthrough -Wno-unused-const-variable)
 
     target_link_libraries(${COMPONENT_LIB} INTERFACE "-L${CMAKE_CURRENT_LIST_DIR}/controller/lib")
     target_link_libraries(${COMPONENT_LIB} PUBLIC btdm_app)

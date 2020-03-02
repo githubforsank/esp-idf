@@ -37,7 +37,6 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include "freertos/queue.h"
-#include "freertos/portmacro.h"
 
 #include "esp_heap_caps_init.h"
 #include "sdkconfig.h"
@@ -45,7 +44,6 @@
 #include "esp_spi_flash.h"
 #include "esp_flash_internal.h"
 #include "nvs_flash.h"
-#include "esp_event.h"
 #include "esp_spi_flash.h"
 #include "esp_private/crosscore_int.h"
 #include "esp_log.h"
@@ -71,6 +69,7 @@
 #include "esp_ota_ops.h"
 #include "esp_efuse.h"
 #include "bootloader_flash_config.h"
+#include "bootloader_mem.h"
 
 #ifdef CONFIG_APP_BUILD_TYPE_ELF_RAM
 #include "esp32/rom/efuse.h"
@@ -128,8 +127,8 @@ void IRAM_ATTR call_start_cpu0(void)
 #else
     RESET_REASON rst_reas[2];
 #endif
-    cpu_configure_region_protection();
-    cpu_init_memctl();
+
+    bootloader_init_mem();
 
     //Move exception vectors to IRAM
     asm volatile (\
@@ -279,8 +278,8 @@ void IRAM_ATTR call_start_cpu1(void)
                   ::"r"(&_init_start));
 
     ets_set_appcpu_boot_addr(0);
-    cpu_configure_region_protection();
-    cpu_init_memctl();
+
+    bootloader_init_mem();
 
 #if CONFIG_ESP_CONSOLE_UART_NONE
     ets_install_putc1(NULL);
@@ -372,14 +371,14 @@ void start_cpu0_default(void)
 #endif
     esp_timer_init();
     esp_set_time_from_rtc();
-#if CONFIG_ESP32_APPTRACE_ENABLE
+#if CONFIG_APPTRACE_ENABLE
     err = esp_apptrace_init();
     assert(err == ESP_OK && "Failed to init apptrace module on PRO CPU!");
 #endif
 #if CONFIG_SYSVIEW_ENABLE
     SEGGER_SYSVIEW_Conf();
 #endif
-#if CONFIG_ESP32_DEBUG_STUBS_ENABLE
+#if CONFIG_ESP_DEBUG_STUBS_ENABLE
     esp_dbg_stubs_init();
 #endif
     err = esp_pthread_init();
@@ -444,15 +443,11 @@ void start_cpu0_default(void)
 
 #if CONFIG_ESP32_ENABLE_COREDUMP
     esp_core_dump_init();
-    size_t core_data_sz = 0;
-    size_t core_data_addr = 0;
-    if (esp_core_dump_image_get(&core_data_addr, &core_data_sz) == ESP_OK && core_data_sz > 0) {
-        ESP_LOGI(TAG, "Found core dump %d bytes in flash @ 0x%x", core_data_sz, core_data_addr);
-    }
 #endif
 
 #if CONFIG_ESP32_WIFI_SW_COEXIST_ENABLE
     esp_coex_adapter_register(&g_coex_adapter_funcs);
+    coex_pre_init();
 #endif
 
     portBASE_TYPE res = xTaskCreatePinnedToCore(&main_task, "main",
@@ -474,7 +469,7 @@ void start_cpu1_default(void)
 #if CONFIG_ESP32_TRAX_TWOBANKS
     trax_start_trace(TRAX_DOWNCOUNT_WORDS);
 #endif
-#if CONFIG_ESP32_APPTRACE_ENABLE
+#if CONFIG_APPTRACE_ENABLE
     esp_err_t err = esp_apptrace_init();
     assert(err == ESP_OK && "Failed to init apptrace module on APP CPU!");
 #endif

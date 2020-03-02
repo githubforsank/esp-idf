@@ -35,6 +35,9 @@
 #if __has_include("esp_ping.h")
 #include "esp_ping.h"
 #endif
+#if __has_include("esp_serial_slave_link/essl.h")
+#include "esp_serial_slave_link/essl.h"
+#endif
 #if __has_include("esp_spi_flash.h")
 #include "esp_spi_flash.h"
 #endif
@@ -105,6 +108,10 @@ static const esp_err_msg_t esp_err_msg_table[] = {
 #   endif
 #   ifdef      ESP_ERR_INVALID_MAC
     ERR_TBL_IT(ESP_ERR_INVALID_MAC),                            /*   267 0x10b MAC address was invalid */
+#   endif
+    // components/esp_serial_slave_link/include/esp_serial_slave_link/essl.h
+#   ifdef      ESP_ERR_NOT_FINISHED
+    ERR_TBL_IT(ESP_ERR_NOT_FINISHED),                           /*   513 0x201 */
 #   endif
     // components/nvs_flash/include/nvs.h
 #   ifdef      ESP_ERR_NVS_BASE
@@ -482,6 +489,12 @@ static const esp_err_msg_t esp_err_msg_table[] = {
 #   ifdef      ESP_ERR_ESP_NETIF_DRIVER_ATTACH_FAILED
     ERR_TBL_IT(ESP_ERR_ESP_NETIF_DRIVER_ATTACH_FAILED),         /* 20488 0x5008 */
 #   endif
+#   ifdef      ESP_ERR_ESP_NETIF_INIT_FAILED
+    ERR_TBL_IT(ESP_ERR_ESP_NETIF_INIT_FAILED),                  /* 20489 0x5009 */
+#   endif
+#   ifdef      ESP_ERR_ESP_NETIF_DNS_NOT_CONFIGURED
+    ERR_TBL_IT(ESP_ERR_ESP_NETIF_DNS_NOT_CONFIGURED),           /* 20490 0x500a */
+#   endif
     // components/esp_common/include/esp_err.h
 #   ifdef      ESP_ERR_FLASH_BASE
     ERR_TBL_IT(ESP_ERR_FLASH_BASE),                             /* 24576 0x6000 Starting number of flash error codes */
@@ -587,6 +600,34 @@ static const esp_err_msg_t esp_err_msg_table[] = {
 #   endif
 #   ifdef      ESP_ERR_MBEDTLS_SSL_CONF_PSK_FAILED
     ERR_TBL_IT(ESP_ERR_MBEDTLS_SSL_CONF_PSK_FAILED),            /* 32785 0x8011 mbedtls api returned failed */
+#   endif
+#   ifdef      ESP_ERR_ESP_TLS_CONNECTION_TIMEOUT
+    ERR_TBL_IT(ESP_ERR_ESP_TLS_CONNECTION_TIMEOUT),             /* 32786 0x8012 new connection in esp_tls_low_level_conn
+                                                                                connection timeouted */
+#   endif
+#   ifdef      ESP_ERR_WOLFSSL_SSL_SET_HOSTNAME_FAILED
+    ERR_TBL_IT(ESP_ERR_WOLFSSL_SSL_SET_HOSTNAME_FAILED),        /* 32787 0x8013 wolfSSL api returned error */
+#   endif
+#   ifdef      ESP_ERR_WOLFSSL_SSL_CONF_ALPN_PROTOCOLS_FAILED
+    ERR_TBL_IT(ESP_ERR_WOLFSSL_SSL_CONF_ALPN_PROTOCOLS_FAILED), /* 32788 0x8014 wolfSSL api returned error */
+#   endif
+#   ifdef      ESP_ERR_WOLFSSL_CERT_VERIFY_SETUP_FAILED
+    ERR_TBL_IT(ESP_ERR_WOLFSSL_CERT_VERIFY_SETUP_FAILED),       /* 32789 0x8015 wolfSSL api returned error */
+#   endif
+#   ifdef      ESP_ERR_WOLFSSL_KEY_VERIFY_SETUP_FAILED
+    ERR_TBL_IT(ESP_ERR_WOLFSSL_KEY_VERIFY_SETUP_FAILED),        /* 32790 0x8016 wolfSSL api returned error */
+#   endif
+#   ifdef      ESP_ERR_WOLFSSL_SSL_HANDSHAKE_FAILED
+    ERR_TBL_IT(ESP_ERR_WOLFSSL_SSL_HANDSHAKE_FAILED),           /* 32791 0x8017 wolfSSL api returned failed */
+#   endif
+#   ifdef      ESP_ERR_WOLFSSL_CTX_SETUP_FAILED
+    ERR_TBL_IT(ESP_ERR_WOLFSSL_CTX_SETUP_FAILED),               /* 32792 0x8018 wolfSSL api returned failed */
+#   endif
+#   ifdef      ESP_ERR_WOLFSSL_SSL_SETUP_FAILED
+    ERR_TBL_IT(ESP_ERR_WOLFSSL_SSL_SETUP_FAILED),               /* 32793 0x8019 wolfSSL api returned failed */
+#   endif
+#   ifdef      ESP_ERR_WOLFSSL_SSL_WRITE_FAILED
+    ERR_TBL_IT(ESP_ERR_WOLFSSL_SSL_WRITE_FAILED),               /* 32794 0x801a wolfSSL api returned failed */
 #   endif
     // components/esp_https_ota/include/esp_https_ota.h
 #   ifdef      ESP_ERR_HTTPS_OTA_BASE

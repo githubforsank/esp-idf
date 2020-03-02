@@ -303,7 +303,7 @@ menu "ESP32-specific"
         default ESP32_UNIVERSAL_MAC_ADDRESSES_FOUR
         help
             Configure the number of universally administered (by IEEE) MAC addresses.
-            During initialisation, MAC addresses for each network interface are generated or derived from a
+            During initialization, MAC addresses for each network interface are generated or derived from a
             single base MAC address.
             If the number of universal MAC addresses is four, all four interfaces (WiFi station, WiFi softap,
             Bluetooth and Ethernet) receive a universally administered MAC address. These are generated
@@ -319,8 +319,15 @@ menu "ESP32-specific"
 
         config ESP32_UNIVERSAL_MAC_ADDRESSES_TWO
             bool "Two"
+            select ESP_MAC_ADDR_UNIVERSE_WIFI_STA
+            select ESP_MAC_ADDR_UNIVERSE_BT
+
         config ESP32_UNIVERSAL_MAC_ADDRESSES_FOUR
             bool "Four"
+            select ESP_MAC_ADDR_UNIVERSE_WIFI_STA
+            select ESP_MAC_ADDR_UNIVERSE_WIFI_AP
+            select ESP_MAC_ADDR_UNIVERSE_BT
+            select ESP_MAC_ADDR_UNIVERSE_ETH
     endchoice
 
     config ESP32_UNIVERSAL_MAC_ADDRESSES
@@ -389,14 +396,6 @@ menu "ESP32-specific"
             The FreeRTOS panic and unhandled exception handers can detect a JTAG OCD debugger and
             instead of panicking, have the debugger stop on the offending instruction.
 
-    config ESP32_DEBUG_STUBS_ENABLE
-        bool "OpenOCD debug stubs"
-        default COMPILER_OPTIMIZATION_DEFAULT
-        depends on !ESP32_TRAX
-        help
-            Debug stubs are used by OpenOCD to execute pre-compiled onboard code which does some useful debugging,
-            e.g. GCOV data dump.
-
     config ESP32_BROWNOUT_DET
         bool "Hardware brownout detect & reset"
         default y
@@ -455,8 +454,7 @@ menu "ESP32-specific"
             When brownout reset occurs, reduce PHY TX power to keep the code running
 
             # Note about the use of "FRC1" name: currently FRC1 timer is not used for
-            # high resolution timekeeping anymore. Instead the esp_timer API, implemented
-            # using FRC2 timer, is used.
+            # high resolution timekeeping anymore. Instead the esp_timer API is used.
             # FRC1 name in the option name is kept for compatibility.
     choice ESP32_TIME_SYSCALL
         prompt "Timers used for gettimeofday function"
@@ -702,6 +700,16 @@ menu "ESP32-specific"
             To prevent interrupting DPORT workarounds,
             need to disable interrupt with a maximum used level in the system.
 
+    config ESP32_IRAM_AS_8BIT_ACCESSIBLE_MEMORY
+        bool "Enable IRAM as 8 bit accessible memory"
+        depends on FREERTOS_UNICORE
+        help
+            If enabled, application can use IRAM as byte accessible region for storing data
+            (Note: IRAM region cannot be used as task stack)
+
+            This is possible due to handling of exceptions `LoadStoreError (3)` and `LoadStoreAlignmentError (9)`
+            Each unaligned read/write access will incur a penalty of maximum of 167 CPU cycles.
+
 endmenu  # ESP32-Specific
 
 menu "Power Management"
@@ -733,7 +741,7 @@ menu "Power Management"
 
     config PM_USE_RTC_TIMER_REF
         bool "Use RTC timer to prevent time drift (EXPERIMENTAL)"
-        depends on PM_ENABLE && (ESP32_TIME_SYSCALL_USE_RTC || ESP32_TIME_SYSCALL_USE_RTC_FRC1)
+        depends on PM_ENABLE && ESP_TIMER_IMPL_FRC2 && (ESP32_TIME_SYSCALL_USE_RTC || ESP32_TIME_SYSCALL_USE_RTC_FRC1)
         default n
         help
             When APB clock frequency changes, high-resolution timer (esp_timer)

@@ -6,7 +6,7 @@
 # Includes information which is not shown in "xtensa-esp32-elf-size",
 # or easy to parse from "xtensa-esp32-elf-objdump" or raw map files.
 #
-# Copyright 2017-2018 Espressif Systems (Shanghai) PTE LTD
+# Copyright 2017-2020 Espressif Systems (Shanghai) PTE LTD
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@
 from __future__ import print_function
 from __future__ import unicode_literals
 from __future__ import division
+from future.utils import iteritems
 import argparse
 import collections
 import json
@@ -31,21 +32,128 @@ import re
 import sys
 
 DEFAULT_TOOLCHAIN_PREFIX = "xtensa-esp32-elf-"
-
-CHIP_SIZES = {
-    "esp32": {
-        "total_iram": 0x20000,
-        "total_irom": 0x330000,
-        "total_drom": 0x800000,
-        # total dram is determined from objdump output
-    }
-}
+GLOBAL_JSON_INDENT = 4
+GLOBAL_JSON_SEPARATORS = (',', ': ')
 
 
-def _json_dump(obj):
-    """ Pretty-print JSON object to stdout """
-    json.dump(obj, sys.stdout, indent=4)
-    print('\n')
+class MemRegions(object):
+    (DRAM_ID, IRAM_ID, DIRAM_ID) = range(3)
+
+    @staticmethod
+    def get_mem_regions(target):
+        # The target specific memory structure is deduced from soc_memory_types defined in
+        # $IDF_PATH/components/soc/**/soc_memory_layout.c files.
+
+        # The order of variables in the tuple is the same as in the soc_memory_layout.c files
+        MemRegDef = collections.namedtuple('MemRegDef', ['primary_addr', 'length', 'type', 'secondary_addr'])
+
+        if target == 'esp32':
+            return sorted([
+                # TODO comment this
+                MemRegDef(0x3FFAE000, 17 * 0x2000 + 2 * 0x8000, MemRegions.DRAM_ID, 0),
+                # MemRegDef(0x3FFAE000, 0x2000, MemRegions.DRAM_ID, 0),
+                # MemRegDef(0x3FFB0000, 0x8000, MemRegions.DRAM_ID, 0),
+                # MemRegDef(0x3FFB8000, 0x8000, MemRegions.DRAM_ID, 0),
+                # MemRegDef(0x3FFC0000, 0x2000, MemRegions.DRAM_ID, 0),
+                # MemRegDef(0x3FFC2000, 0x2000, MemRegions.DRAM_ID, 0),
+                # MemRegDef(0x3FFC4000, 0x2000, MemRegions.DRAM_ID, 0),
+                # MemRegDef(0x3FFC6000, 0x2000, MemRegions.DRAM_ID, 0),
+                # MemRegDef(0x3FFC8000, 0x2000, MemRegions.DRAM_ID, 0),
+                # MemRegDef(0x3FFCA000, 0x2000, MemRegions.DRAM_ID, 0),
+                # MemRegDef(0x3FFCC000, 0x2000, MemRegions.DRAM_ID, 0),
+                # MemRegDef(0x3FFCE000, 0x2000, MemRegions.DRAM_ID, 0),
+                # MemRegDef(0x3FFD0000, 0x2000, MemRegions.DRAM_ID, 0),
+                # MemRegDef(0x3FFD2000, 0x2000, MemRegions.DRAM_ID, 0),
+                # MemRegDef(0x3FFD4000, 0x2000, MemRegions.DRAM_ID, 0),
+                # MemRegDef(0x3FFD6000, 0x2000, MemRegions.DRAM_ID, 0),
+                # MemRegDef(0x3FFD8000, 0x2000, MemRegions.DRAM_ID, 0),
+                # MemRegDef(0x3FFDA000, 0x2000, MemRegions.DRAM_ID, 0),
+                # MemRegDef(0x3FFDC000, 0x2000, MemRegions.DRAM_ID, 0),
+                # MemRegDef(0x3FFDE000, 0x2000, MemRegions.DRAM_ID, 0),
+                #
+                MemRegDef(0x3FFE0000, 4 * 0x4000 + 2 * 0x8000, MemRegions.DIRAM_ID, 0x400BC000),
+                # MemRegDef(0x3FFE0000, 0x4000, MemRegions.DIRAM_ID, 0x400BC000),
+                # MemRegDef(0x3FFE4000, 0x4000, MemRegions.DIRAM_ID, 0x400B8000),
+                # MemRegDef(0x3FFE8000, 0x8000, MemRegions.DIRAM_ID, 0x400B0000),
+                # MemRegDef(0x3FFF0000, 0x8000, MemRegions.DIRAM_ID, 0x400A8000),
+                # MemRegDef(0x3FFF8000, 0x4000, MemRegions.DIRAM_ID, 0x400A4000),
+                # MemRegDef(0x3FFFC000, 0x4000, MemRegions.DIRAM_ID, 0x400A0000),
+                #
+                MemRegDef(0x40070000, 2 * 0x8000 + 16 * 0x2000, MemRegions.IRAM_ID, 0),
+                # MemRegDef(0x40070000, 0x8000, MemRegions.IRAM_ID, 0),
+                # MemRegDef(0x40078000, 0x8000, MemRegions.IRAM_ID, 0),
+                # MemRegDef(0x40080000, 0x2000, MemRegions.IRAM_ID, 0),
+                # MemRegDef(0x40082000, 0x2000, MemRegions.IRAM_ID, 0),
+                # MemRegDef(0x40084000, 0x2000, MemRegions.IRAM_ID, 0),
+                # MemRegDef(0x40086000, 0x2000, MemRegions.IRAM_ID, 0),
+                # MemRegDef(0x40088000, 0x2000, MemRegions.IRAM_ID, 0),
+                # MemRegDef(0x4008A000, 0x2000, MemRegions.IRAM_ID, 0),
+                # MemRegDef(0x4008C000, 0x2000, MemRegions.IRAM_ID, 0),
+                # MemRegDef(0x4008E000, 0x2000, MemRegions.IRAM_ID, 0),
+                # MemRegDef(0x40090000, 0x2000, MemRegions.IRAM_ID, 0),
+                # MemRegDef(0x40092000, 0x2000, MemRegions.IRAM_ID, 0),
+                # MemRegDef(0x40094000, 0x2000, MemRegions.IRAM_ID, 0),
+                # MemRegDef(0x40096000, 0x2000, MemRegions.IRAM_ID, 0),
+                # MemRegDef(0x40098000, 0x2000, MemRegions.IRAM_ID, 0),
+                # MemRegDef(0x4009A000, 0x2000, MemRegions.IRAM_ID, 0),
+                # MemRegDef(0x4009C000, 0x2000, MemRegions.IRAM_ID, 0),
+                # MemRegDef(0x4009E000, 0x2000, MemRegions.IRAM_ID, 0),
+            ])
+        elif target == 'esp32s2':
+            return sorted([
+                # The following one memory region is defined instead of defining all 3 + 11 individually because their
+                # type (MemRegions.DIRAM_ID) is the same
+                MemRegDef(0x3FFB2000, 3 * 0x2000 + 11 * 0x4000, MemRegions.DIRAM_ID, 0x40022000),
+                # MemRegDef(0x3FFB2000, 0x2000, MemRegions.DIRAM_ID, 0x40022000),
+                # MemRegDef(0x3FFB4000, 0x2000, MemRegions.DIRAM_ID, 0x40024000),
+                # MemRegDef(0x3FFB6000, 0x2000, MemRegions.DIRAM_ID, 0x40026000),
+                # MemRegDef(0x3FFB8000, 0x4000, MemRegions.DIRAM_ID, 0x40028000),
+                # MemRegDef(0x3FFBC000, 0x4000, MemRegions.DIRAM_ID, 0x4002C000),
+                # MemRegDef(0x3FFC0000, 0x4000, MemRegions.DIRAM_ID, 0x40030000),
+                # MemRegDef(0x3FFC4000, 0x4000, MemRegions.DIRAM_ID, 0x40034000),
+                # MemRegDef(0x3FFC8000, 0x4000, MemRegions.DIRAM_ID, 0x40038000),
+                # MemRegDef(0x3FFCC000, 0x4000, MemRegions.DIRAM_ID, 0x4003C000),
+                # MemRegDef(0x3FFD0000, 0x4000, MemRegions.DIRAM_ID, 0x40040000),
+                # MemRegDef(0x3FFD4000, 0x4000, MemRegions.DIRAM_ID, 0x40044000),
+                # MemRegDef(0x3FFD8000, 0x4000, MemRegions.DIRAM_ID, 0x40048000),
+                # MemRegDef(0x3FFDC000, 0x4000, MemRegions.DIRAM_ID, 0x4004C000),
+                # MemRegDef(0x3FFE0000, 0x4000, MemRegions.DIRAM_ID, 0x40050000),
+                #
+                # 2nd stage bootloader iram_loader_seg starts at block 15. Therefore, the following blocks are not
+                # defined here and will not be counted in the total amount of available space
+                # MemRegDef(0x3FFE4000, 0x4000, MemRegions.DIRAM_ID, 0x40054000),
+                # MemRegDef(0x3FFE8000, 0x4000, MemRegions.DIRAM_ID, 0x40058000),
+                # MemRegDef(0x3FFEC000, 0x4000, MemRegions.DIRAM_ID, 0x4005C000),
+                # MemRegDef(0x3FFF0000, 0x4000, MemRegions.DIRAM_ID, 0x40060000),
+                # MemRegDef(0x3FFF4000, 0x4000, MemRegions.DIRAM_ID, 0x40064000),
+                # MemRegDef(0x3FFF8000, 0x4000, MemRegions.DIRAM_ID, 0x40068000),
+                # MemRegDef(0x3FFFC000, 0x4000, MemRegions.DIRAM_ID, 0x4006C000),
+                # Note the type of the last block which is in contrast with soc_memory_layout.c. It is used for
+                # startup stack therefore the type is D/IRAM (from the perspective of idf_size) and not DRAM.
+            ])
+        else:
+            return None
+
+    def __init__(self, target):
+        self.chip_mem_regions = self.get_mem_regions(target)
+        if not self.chip_mem_regions:
+            raise RuntimeError('Target {} is not implemented in idf_size'.format(target))
+
+    def _address_in_range(address, length, reg_address, reg_length):
+        return address >= reg_address and (address - reg_address) <= (reg_length - length)
+
+    def get_names(self, dictionary, region_id):
+        result = []
+        # TODO alebo origin a length
+        for m in self.chip_mem_regions:
+            result.append([n for (n, c) in iteritems(dictionary) if (self._address_in_range(c.address, c.size,
+                                                                     m.primary_addr, m.length) or
+                                                                     (m.type == self.DIRAM_ID and
+                                                                      self._address_in_range(c.address,
+                                                                                             c.size,
+                                                                                             m.secondary_addr,
+                                                                                             m.length)))])
+        return result
 
 
 def scan_to_header(f, header_line):
@@ -54,6 +162,10 @@ def scan_to_header(f, header_line):
         if line.strip() == header_line:
             return
     raise RuntimeError("Didn't find line '%s' in file" % header_line)
+
+
+def format_json(json_object):
+    return json.dumps(json_object, indent=GLOBAL_JSON_INDENT, separators=GLOBAL_JSON_SEPARATORS) + "\n"
 
 
 def load_map_data(map_file):
@@ -66,9 +178,10 @@ def load_memory_config(map_file):
     """ Memory Configuration section is the total size of each output section """
     result = {}
     scan_to_header(map_file, "Memory Configuration")
-    RE_MEMORY_SECTION = r"(?P<name>[^ ]+) +0x(?P<origin>[\da-f]+) +0x(?P<length>[\da-f]+)"
+    RE_MEMORY_SECTION = re.compile(r"(?P<name>[^ ]+) +0x(?P<origin>[\da-f]+) +0x(?P<length>[\da-f]+)")
+
     for line in map_file:
-        m = re.match(RE_MEMORY_SECTION, line)
+        m = RE_MEMORY_SECTION.match(line)
         if m is None:
             if len(result) == 0:
                 continue  # whitespace or a header, before the content we want
@@ -92,13 +205,32 @@ def load_sections(map_file):
     information for each symbol linked into the section.
     """
     scan_to_header(map_file, "Linker script and memory map")
+
+    # output section header, ie '.iram0.text     0x0000000040080400    0x129a5'
+    RE_SECTION_HEADER = re.compile(r"(?P<name>[^ ]+) +0x(?P<address>[\da-f]+) +0x(?P<size>[\da-f]+)$")
+
+    # source file line, ie
+    # 0x0000000040080400       0xa4 /home/gus/esp/32/idf/examples/get-started/hello_world/build/esp32/libesp32.a(cpu_start.o)
+    # cmake build system links some object files directly, not part of any archive, so make that part optional
+    #  .xtensa.info   0x0000000000000000       0x38 CMakeFiles/hello-world.elf.dir/project_elf_src.c.obj
+    RE_SOURCE_LINE = re.compile(r"\s*(?P<sym_name>\S*) +0x(?P<address>[\da-f]+) +0x(?P<size>[\da-f]+) (?P<archive>.+\.a)?\(?(?P<object_file>.+\.(o|obj))\)?")
+
+    # Fast check to see if line is a potential source line before running the slower full regex against it
+    RE_PRE_FILTER = re.compile(r".*\.(o|obj)\)?")
+
+    # Check for lines which only contain the sym name (and rest is on following lines)
+    RE_SYMBOL_ONLY_LINE = re.compile(r"^ (?P<sym_name>\S*)$")
+
     sections = {}
     section = None
     sym_backup = None
     for line in map_file:
-        # output section header, ie '.iram0.text     0x0000000040080400    0x129a5'
-        RE_SECTION_HEADER = r"(?P<name>[^ ]+) +0x(?P<address>[\da-f]+) +0x(?P<size>[\da-f]+)$"
-        m = re.match(RE_SECTION_HEADER, line)
+
+        if line.strip() == "Cross Reference Table":
+            # stop processing lines because we are at the next section in the map file
+            break
+
+        m = RE_SECTION_HEADER.match(line)
         if m is not None:  # start of a new section
             section = {
                 "name": m.group("name"),
@@ -109,37 +241,34 @@ def load_sections(map_file):
             sections[section["name"]] = section
             continue
 
-        # source file line, ie
-        # 0x0000000040080400       0xa4 /home/gus/esp/32/idf/examples/get-started/hello_world/build/esp32/libesp32.a(cpu_start.o)
-        RE_SOURCE_LINE = r"\s*(?P<sym_name>\S*).* +0x(?P<address>[\da-f]+) +0x(?P<size>[\da-f]+) (?P<archive>.+\.a)\((?P<object_file>.+\.ob?j?)\)"
+        if section is not None:
+            m = RE_SYMBOL_ONLY_LINE.match(line)
+            if m is not None:
+                # In some cases the section name appears on the previous line, back it up in here
+                sym_backup = m.group("sym_name")
+                continue
 
-        m = re.match(RE_SOURCE_LINE, line, re.M)
-        if not m:
-            # cmake build system links some object files directly, not part of any archive
-            RE_SOURCE_LINE = r"\s*(?P<sym_name>\S*).* +0x(?P<address>[\da-f]+) +0x(?P<size>[\da-f]+) (?P<object_file>.+\.ob?j?)"
-            m = re.match(RE_SOURCE_LINE, line)
-        if section is not None and m is not None:  # input source file details=ma,e
-            sym_name = m.group("sym_name") if len(m.group("sym_name")) > 0 else sym_backup
-            try:
+            if not RE_PRE_FILTER.match(line):
+                # line does not match our quick check, so skip to next line
+                continue
+
+            m = RE_SOURCE_LINE.match(line)
+            if m is not None:  # input source file details=ma,e
+                sym_name = m.group("sym_name") if len(m.group("sym_name")) > 0 else sym_backup
                 archive = m.group("archive")
-            except IndexError:
-                archive = "(exe)"
+                if archive is None:
+                    # optional named group "archive" was not matched, so assign a value to it
+                    archive = "(exe)"
 
-            source = {
-                "size": int(m.group("size"), 16),
-                "address": int(m.group("address"), 16),
-                "archive": os.path.basename(archive),
-                "object_file": os.path.basename(m.group("object_file")),
-                "sym_name": sym_name,
-            }
-            source["file"] = "%s:%s" % (source["archive"], source["object_file"])
-            section["sources"] += [source]
-
-        # In some cases the section name appears on the previous line, back it up in here
-        RE_SYMBOL_ONLY_LINE = r"^ (?P<sym_name>\S*)$"
-        m = re.match(RE_SYMBOL_ONLY_LINE, line)
-        if section is not None and m is not None:
-            sym_backup = m.group("sym_name")
+                source = {
+                    "size": int(m.group("size"), 16),
+                    "address": int(m.group("address"), 16),
+                    "archive": os.path.basename(archive),
+                    "object_file": os.path.basename(m.group("object_file")),
+                    "sym_name": sym_name,
+                }
+                source["file"] = "%s:%s" % (source["archive"], source["object_file"])
+                section["sources"] += [source]
 
     return sections
 
@@ -163,9 +292,10 @@ def sizes_by_key(sections, key):
 
 
 def main():
-    parser = argparse.ArgumentParser("idf_size - a tool to print IDF elf file sizes")
+    parser = argparse.ArgumentParser(description="idf_size - a tool to print size information from an IDF MAP file")
 
     parser.add_argument(
+        # FIXME: toolchain is not used
         '--toolchain-prefix',
         help="Triplet prefix to add before objdump executable",
         default=DEFAULT_TOOLCHAIN_PREFIX)
@@ -188,21 +318,38 @@ def main():
     parser.add_argument(
         '--files', help='Print per-file sizes', action='store_true')
 
+    parser.add_argument(
+        '--target', help='Set target chip', default='esp32')
+
+    parser.add_argument(
+        '-o',
+        '--output-file',
+        type=argparse.FileType('w'),
+        default=sys.stdout,
+        help="Print output to the specified file instead of stdout")
+
     args = parser.parse_args()
+
+    mem_regions = MemRegions(args.target)
+
+    output = ""
 
     memory_config, sections = load_map_data(args.map_file)
     if not args.json or not (args.archives or args.files or args.archive_details):
-        print_summary(memory_config, sections, args.json)
+        output += get_summary(mem_regions, memory_config, sections, args.json)
 
     if args.archives:
-        print_detailed_sizes(sections, "archive", "Archive File", args.json)
+        output += get_detailed_sizes(mem_regions, sections, "archive", "Archive File", args.json)
     if args.files:
-        print_detailed_sizes(sections, "file", "Object File", args.json)
+        output += get_detailed_sizes(mem_regions, sections, "file", "Object File", args.json)
+
     if args.archive_details:
-        print_archive_symbols(sections, args.archive_details, args.json)
+        output += get_archive_symbols(mem_regions, sections, args.archive_details, args.json)
+
+    args.output_file.write(output)
 
 
-def print_summary(memory_config, sections, as_json=False):
+def get_summary(mem_regions, memory_config, sections, as_json=False):
     def get_size(section):
         try:
             return sections[section]["size"]
@@ -228,8 +375,9 @@ def print_summary(memory_config, sections, as_json=False):
     flash_rodata = get_size(".flash.rodata")
     total_size = used_data + used_iram + flash_code + flash_rodata
 
+    output = ""
     if as_json:
-        _json_dump(collections.OrderedDict([
+        output = format_json(collections.OrderedDict([
             ("dram_data", used_data),
             ("dram_bss", used_bss),
             ("used_dram", used_dram),
@@ -243,31 +391,34 @@ def print_summary(memory_config, sections, as_json=False):
             ("total_size", total_size)
         ]))
     else:
-        print("Total sizes:")
-        print(" DRAM .data size: %7d bytes" % used_data)
-        print(" DRAM .bss  size: %7d bytes" % used_bss)
-        print("Used static DRAM: %7d bytes (%7d available, %.1f%% used)" %
-              (used_dram, total_dram - used_dram, 100.0 * used_dram_ratio))
-        print("Used static IRAM: %7d bytes (%7d available, %.1f%% used)" %
-              (used_iram, total_iram - used_iram, 100.0 * used_iram_ratio))
-        print("      Flash code: %7d bytes" % flash_code)
-        print("    Flash rodata: %7d bytes" % flash_rodata)
-        print("Total image size:~%7d bytes (.bin may be padded larger)" % (total_size))
+        output += "Total sizes:\n"
+        output += " DRAM .data size: {:>7} bytes\n".format(used_data)
+        output += " DRAM .bss  size: {:>7} bytes\n".format(used_bss)
+        output += "Used static DRAM: {:>7} bytes ({:>7} available, {:.1%} used)\n".format(
+            used_dram, total_dram - used_dram, used_dram_ratio)
+        output += "Used static IRAM: {:>7} bytes ({:>7} available, {:.1%} used)\n".format(
+            used_iram, total_iram - used_iram, used_iram_ratio)
+        output += "      Flash code: {:>7} bytes\n".format(flash_code)
+        output += "    Flash rodata: {:>7} bytes\n".format(flash_rodata)
+        output += "Total image size:~{:>7} bytes (.bin may be padded larger)\n".format(total_size)
+
+    return output
 
 
-def print_detailed_sizes(sections, key, header, as_json=False):
+def get_detailed_sizes(mem_regions, sections, key, header, as_json=False):
     sizes = sizes_by_key(sections, key)
 
     result = {}
     for k in sizes:
         v = sizes[k]
-        result[k] = collections.OrderedDict()
-        result[k]["data"] = v.get(".dram0.data", 0)
-        result[k]["bss"] = v.get(".dram0.bss", 0)
-        result[k]["iram"] = sum(t for (s,t) in v.items() if s.startswith(".iram0"))
-        result[k]["flash_text"] = v.get(".flash.text", 0)
-        result[k]["flash_rodata"] = v.get(".flash.rodata", 0)
-        result[k]["total"] = sum(result[k].values())
+        r = collections.OrderedDict()
+        r["data"] = v.get(".dram0.data", 0)
+        r["bss"] = v.get(".dram0.bss", 0)
+        r["iram"] = sum(t for (s,t) in v.items() if s.startswith(".iram0"))
+        r["flash_text"] = v.get(".flash.text", 0)
+        r["flash_rodata"] = v.get(".flash.rodata", 0)
+        r["total"] = sum(r.values())
+        result[k] = r
 
     def return_total_size(elem):
         val = elem[1]
@@ -280,33 +431,37 @@ def print_detailed_sizes(sections, key, header, as_json=False):
     # do a secondary sort in order to have consistent order (for diff-ing the output)
     s = sorted(s, key=return_total_size, reverse=True)
 
+    output = ""
+
     if as_json:
-        _json_dump(collections.OrderedDict(s))
+        output = format_json(collections.OrderedDict(s))
     else:
-        print("Per-%s contributions to ELF file:" % key)
-        headings = (header,
-                    "DRAM .data",
-                    "& .bss",
-                    "IRAM",
-                    "Flash code",
-                    "& rodata",
-                    "Total")
-        header_format = "%24s %10d %6d %6d %10d %8d %7d"
-        print(header_format.replace("d", "s") % headings)
+        header_format = "{:>24} {:>10} {:>6} {:>6} {:>10} {:>8} {:>7}\n"
+
+        output += "Per-{} contributions to ELF file:\n".format(key)
+        output += header_format.format(header,
+                                       "DRAM .data",
+                                       "& .bss",
+                                       "IRAM",
+                                       "Flash code",
+                                       "& rodata",
+                                       "Total")
 
         for k,v in s:
             if ":" in k:  # print subheadings for key of format archive:file
                 sh,k = k.split(":")
-            print(header_format % (k[:24],
-                                   v["data"],
-                                   v["bss"],
-                                   v["iram"],
-                                   v["flash_text"],
-                                   v["flash_rodata"],
-                                   v["total"]))
+            output += header_format.format(k[:24],
+                                           v["data"],
+                                           v["bss"],
+                                           v["iram"],
+                                           v["flash_text"],
+                                           v["flash_rodata"],
+                                           v["total"])
+
+    return output
 
 
-def print_archive_symbols(sections, archive, as_json=False):
+def get_archive_symbols(mem_regions, sections, archive, as_json=False):
     interested_sections = [".dram0.data", ".dram0.bss", ".iram0.text", ".iram0.vectors", ".flash.text", ".flash.rodata"]
     result = {}
     for t in interested_sections:
@@ -329,17 +484,20 @@ def print_archive_symbols(sections, archive, as_json=False):
         s = sorted(s, key=lambda k_v: k_v[1], reverse=True)
         section_symbols[t] = collections.OrderedDict(s)
 
+    output = ""
     if as_json:
-        _json_dump(section_symbols)
+        output = format_json(section_symbols)
     else:
-        print("Symbols within the archive: %s (Not all symbols may be reported)" % (archive))
+        output += "Symbols within the archive: {} (Not all symbols may be reported)\n".format(archive)
         for t,s in section_symbols.items():
             section_total = 0
-            print("\nSymbols from section:", t)
+            output += "\nSymbols from section: {}\n".format(t)
             for key, val in s.items():
-                print(("%s(%d)" % (key.replace(t + ".", ""), val)), end=' ')
+                output += "{}({}) ".format(key.replace(t + ".", ""), val)
                 section_total += val
-            print("\nSection total:",section_total)
+            output += "\nSection total: {}\n".format(section_total)
+
+    return output
 
 
 if __name__ == "__main__":

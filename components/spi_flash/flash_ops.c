@@ -21,8 +21,6 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/semphr.h>
-#include <esp32/rom/spi_flash.h>
-#include <esp32/rom/cache.h>
 #include <soc/soc.h>
 #include <soc/dport_reg.h>
 #include <soc/soc_memory_layout.h>
@@ -32,9 +30,13 @@
 #include "esp_spi_flash.h"
 #include "esp_log.h"
 #if CONFIG_IDF_TARGET_ESP32
+#include "esp32/rom/spi_flash.h"
+#include "esp32/rom/cache.h"
 #include "esp32/clk.h"
-#elif CONFIG_IDF_TARGET_ESP32S2BETA
-#include "esp32s2beta/clk.h"
+#elif CONFIG_IDF_TARGET_ESP32S2
+#include "esp32s2/rom/spi_flash.h"
+#include "esp32s2/rom/cache.h"
+#include "esp32s2/clk.h"
 #include "soc/spi_mem_reg.h"
 #include "soc/spi_mem_struct.h"
 #endif
@@ -793,7 +795,7 @@ void spi_flash_dump_counters(void)
 
 #endif //CONFIG_SPI_FLASH_ENABLE_COUNTERS
 
-#if CONFIG_IDF_TARGET_ESP32S2BETA
+#if CONFIG_IDF_TARGET_ESP32S2
 #define SPICACHE SPIMEM0
 #define SPIFLASH SPIMEM1
 #define FLASH_WRAP_CMD 0x77
@@ -804,7 +806,7 @@ esp_err_t spi_flash_wrap_set(spi_flash_wrap_mode_t mode)
     SPIFLASH.user.fwrite_dio = 0;
     SPIFLASH.user.fwrite_dual = 0;
     SPIFLASH.user.fwrite_qio = 1;
-    SPIFLASH.user.fwrite_quad = 0;  
+    SPIFLASH.user.fwrite_quad = 0;
     SPIFLASH.ctrl.fcmd_dual = 0;
     SPIFLASH.ctrl.fcmd_quad = 0;
     SPIFLASH.user.usr_dummy = 0;
@@ -865,7 +867,7 @@ bool spi_flash_support_wrap_size(uint32_t wrap_size)
     }
 }
 #endif
-#if defined(CONFIG_SPI_FLASH_USE_LEGACY_IMPL) && defined(CONFIG_IDF_TARGET_ESP32S2BETA)
-// TODO esp32s2beta: Remove once ESP32S2Beta has new SPI Flash API support
+#if defined(CONFIG_SPI_FLASH_USE_LEGACY_IMPL) && defined(CONFIG_IDF_TARGET_ESP32S2)
+// TODO esp32s2: Remove once ESP32S2 has new SPI Flash API support
 esp_flash_t *esp_flash_default_chip = NULL;
 #endif

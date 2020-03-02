@@ -10,8 +10,6 @@
 #ifndef _NET_H_
 #define _NET_H_
 
-#include "mesh_util.h"
-#include "mesh_kernel.h"
 #include "mesh_access.h"
 
 #define BLE_MESH_NET_FLAG_KR       BIT(0)
@@ -208,7 +206,10 @@ struct bt_mesh_lpn {
 
 /* bt_mesh_net.flags */
 enum {
+    BLE_MESH_NODE,            /* Device is a node */
+    BLE_MESH_PROVISIONER,     /* Device is a Provisioner */
     BLE_MESH_VALID,           /* We have been provisioned */
+    BLE_MESH_VALID_PROV,      /* Provisioner has been enabled */
     BLE_MESH_SUSPENDED,       /* Network is temporarily suspended */
     BLE_MESH_IVU_IN_PROGRESS, /* IV Update in Progress */
     BLE_MESH_IVU_INITIATOR,   /* IV Update initiated by us */
@@ -224,6 +225,7 @@ enum {
     BLE_MESH_HB_PUB_PENDING,
     BLE_MESH_CFG_PENDING,
     BLE_MESH_MOD_PENDING,
+    BLE_MESH_VA_PENDING,
 
     /* Don't touch - intentionally last */
     BLE_MESH_FLAG_COUNT,
@@ -296,7 +298,6 @@ struct bt_mesh_net_rx {
            local_match: 1, /* Matched a local element */
            friend_match: 1; /* Matched an LPN we're friends for */
     u16_t  msg_cache_idx;  /* Index of entry in message cache */
-    s8_t   rssi;
 };
 
 /* Encoding context for Network/Transport data */
@@ -318,6 +319,8 @@ extern struct bt_mesh_net bt_mesh;
 #define BLE_MESH_NET_IVI_RX(rx) (bt_mesh.iv_index - (rx)->old_iv)
 
 #define BLE_MESH_NET_HDR_LEN 9
+
+void bt_mesh_msg_cache_clear(u16_t unicast_addr, u8_t elem_num);
 
 int bt_mesh_net_keys_create(struct bt_mesh_subnet_keys *keys,
                             const u8_t key[16]);
@@ -361,11 +364,17 @@ int bt_mesh_net_decode(struct net_buf_simple *data, enum bt_mesh_net_if net_if,
 void bt_mesh_net_recv(struct net_buf_simple *data, s8_t rssi,
                       enum bt_mesh_net_if net_if);
 
+bool bt_mesh_primary_subnet_exist(void);
+
 u32_t bt_mesh_next_seq(void);
 
 void bt_mesh_net_start(void);
 
 void bt_mesh_net_init(void);
+void bt_mesh_net_deinit(bool erase);
+
+void bt_mesh_net_header_parse(struct net_buf_simple *buf,
+                              struct bt_mesh_net_rx *rx);
 
 /* Friendship Credential Management */
 struct friend_cred {

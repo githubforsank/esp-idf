@@ -8,11 +8,9 @@
 #ifndef _BLE_MESH_KERNEL_H_
 #define _BLE_MESH_KERNEL_H_
 
-#include "osi/mutex.h"
 #include "mesh_types.h"
 #include "mesh_slist.h"
 #include "mesh_atomic.h"
-#include "mesh_dlist.h"
 
 /* number of nsec per usec */
 #define NSEC_PER_USEC   1000
@@ -46,8 +44,6 @@ struct k_work;
  * @return N/A
  */
 typedef void (*k_work_handler_t)(struct k_work *work);
-
-typedef sys_dlist_t _wait_q_t;
 
 struct k_work {
     void *_reserved;
@@ -268,10 +264,17 @@ s64_t k_uptime_get(void);
  */
 void k_sleep(s32_t duration);
 
-unsigned int bt_mesh_irq_lock(void);
-void bt_mesh_irq_unlock(unsigned int key);
+void bt_mesh_list_lock(void);
+void bt_mesh_list_unlock(void);
+
+void bt_mesh_buf_lock(void);
+void bt_mesh_buf_unlock(void);
+
+void bt_mesh_atomic_lock(void);
+void bt_mesh_atomic_unlock(void);
 
 void bt_mesh_k_init(void);
+void bt_mesh_k_deinit(void);
 
 #endif /* _BLE_MESH_KERNEL_H_ */
 

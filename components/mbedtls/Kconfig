@@ -13,6 +13,7 @@ menu "mbedTLS"
               behavior in ESP-IDF
             - Custom allocation mode, by overwriting calloc()/free() using
               mbedtls_platform_set_calloc_free() function
+            - Internal IRAM memory wherever applicable else internal DRAM
 
             Recommended mode here is always internal, since that is most preferred
             from security perspective. But if application requirement does not
@@ -31,6 +32,16 @@ menu "mbedTLS"
 
         config MBEDTLS_CUSTOM_MEM_ALLOC
             bool "Custom alloc mode"
+
+        config MBEDTLS_IRAM_8BIT_MEM_ALLOC
+            bool "Internal IRAM"
+            depends on ESP32_IRAM_AS_8BIT_ACCESSIBLE_MEMORY
+            help
+                Allows to use IRAM memory region as 8bit accessible region.
+
+                TLS input and output buffers will be allocated in IRAM section which is 32bit aligned
+                memory. Every unaligned (8bit or 16bit) access will result in an exception
+                and incur penalty of certain clock cycles per unaligned read/write.
 
     endchoice #MBEDTLS_MEM_ALLOC_MODE
 
@@ -131,9 +142,8 @@ menu "mbedTLS"
 
     config MBEDTLS_HARDWARE_AES
         bool "Enable hardware AES acceleration"
-        depends on IDF_TARGET_ESP32
-        # ToDo: remove once hardware AES acceleration is supported on esp32s2
         default y
+        depends on !IDF_TARGET_ESP32S2
         help
             Enable hardware accelerated AES encryption & decryption.
 
@@ -143,6 +153,7 @@ menu "mbedTLS"
     config MBEDTLS_HARDWARE_MPI
         bool "Enable hardware MPI (bignum) acceleration"
         default y
+        depends on !IDF_TARGET_ESP32S2
         help
             Enable hardware accelerated multiple precision integer operations.
 
@@ -154,6 +165,7 @@ menu "mbedTLS"
     config MBEDTLS_HARDWARE_SHA
         bool "Enable hardware SHA acceleration"
         default y
+        depends on !IDF_TARGET_ESP32S2
         help
             Enable hardware accelerated SHA1, SHA256, SHA384 & SHA512 in mbedTLS.
 
@@ -600,5 +612,17 @@ menu "mbedTLS"
             Disabling this option saves some code size.
 
             # end of Elliptic Curve options
+
+    menuconfig MBEDTLS_SECURITY_RISKS
+        bool "Show configurations with potential security risks"
+        default n
+
+    config MBEDTLS_ALLOW_UNSUPPORTED_CRITICAL_EXT
+        bool "X.509 CRT parsing with unsupported critical extensions"
+        depends on MBEDTLS_SECURITY_RISKS
+        default n
+        help
+            Allow the X.509 certificate parser to load certificates
+            with unsupported critical extensions
 
 endmenu  # mbedTLS

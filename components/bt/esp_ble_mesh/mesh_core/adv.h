@@ -10,6 +10,7 @@
 #ifndef _ADV_H_
 #define _ADV_H_
 
+#include "mesh_access.h"
 #include "mesh_bearer_adapt.h"
 
 /* Maximum advertising data payload for a single data type */
@@ -46,15 +47,10 @@ struct bt_mesh_adv {
               busy: 1;
     u8_t      xmit;
 
-    union {
-        /* Address, used e.g. for Friend Queue messages */
-        u16_t addr;
-
-        /* For transport layer segment sending */
-        struct {
-            u8_t attempts;
-        } seg;
-    };
+    /* For transport layer segment sending */
+    struct {
+        u8_t attempts;
+    } seg;
 };
 
 typedef struct bt_mesh_adv *(*bt_mesh_adv_alloc_t)(int id);
@@ -63,10 +59,21 @@ typedef struct bt_mesh_adv *(*bt_mesh_adv_alloc_t)(int id);
 struct net_buf *bt_mesh_adv_create(enum bt_mesh_adv_type type, u8_t xmit,
                                    s32_t timeout);
 
+typedef enum {
+    BLE_MESH_BUF_REF_EQUAL,
+    BLE_MESH_BUF_REF_SMALL,
+    BLE_MESH_BUF_REF_MAX,
+} bt_mesh_buf_ref_flag_t;
+
+void bt_mesh_adv_buf_ref_debug(const char *func, struct net_buf *buf,
+                               u8_t ref_cmp, bt_mesh_buf_ref_flag_t flag);
+
 struct net_buf *bt_mesh_adv_create_from_pool(struct net_buf_pool *pool,
         bt_mesh_adv_alloc_t get_id,
         enum bt_mesh_adv_type type,
         u8_t xmit, s32_t timeout);
+
+void bt_mesh_unref_buf_from_pool(struct net_buf_pool *pool);
 
 void bt_mesh_adv_send(struct net_buf *buf, const struct bt_mesh_send_cb *cb,
                       void *cb_data);
@@ -84,6 +91,7 @@ u16_t bt_mesh_get_stored_relay_count(void);
 void bt_mesh_adv_update(void);
 
 void bt_mesh_adv_init(void);
+void bt_mesh_adv_deinit(void);
 
 int bt_mesh_scan_enable(void);
 
