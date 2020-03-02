@@ -1514,6 +1514,19 @@ esp_err_t httpd_ws_recv_frame(httpd_req_t *req, httpd_ws_frame_t *pkt, size_t ma
  */
 esp_err_t httpd_ws_send_frame(httpd_req_t *req, httpd_ws_frame_t *pkt);
 
+
+#ifndef HOMEOS_ASYNC_WS_PATCH
+#define HOMEOS_ASYNC_WS_PATCH
+#endif
+
+#ifdef HOMEOS_ASYNC_WS_PATCH
+extern struct sock_db;
+void  *get_sock_db(httpd_req_t *req);
+esp_err_t httpd_ws_async_check_req(struct sock_db *sd);
+esp_err_t httpd_ws_send_frame_async(httpd_handle_t hd,  int sockfd, httpd_ws_frame_t *frame);
+// Patch ends
+#endif
+
 #endif /* CONFIG_HTTPD_WS_SUPPORT */
 /** End of WebSocket related stuff
  * @}
